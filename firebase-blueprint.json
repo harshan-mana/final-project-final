@@ -35,15 +35,17 @@
       "description": "AI-detected traffic violation event.",
       "type": "object",
       "properties": {
-        "type": { "type": "string", "enum": ["TRIPLE_RIDING", "ACCIDENT", "FAKE_PLATE", "OVER_SPEEDING"] },
+        "type": { "type": "string" },
         "vehicleNumber": { "type": "string" },
         "description": { "type": "string" },
         "photoUrl": { "type": "string" },
-        "status": { "type": "string", "enum": ["Pending", "Resolved", "Spam"] },
+        "status": { "type": "string" },
         "timestamp": { "type": "object", "description": "Timestamp object" },
-        "userId": { "type": "string", "description": "Reporter UID" }
+        "userId": { "type": "string", "description": "Reporter UID" },
+        "penaltyAmount": { "type": "number" },
+        "confidence": { "type": "number" }
       },
-      "required": ["type", "vehicleNumber", "status", "timestamp"]
+      "required": ["type", "vehicleNumber", "status"]
     },
     "Alert": {
       "title": "Emergency SOS",
@@ -66,8 +68,17 @@
       "properties": {
         "registrationNumber": { "type": "string" },
         "ownerName": { "type": "string" },
+        "ownerPhone": { "type": "string" },
         "vehicleType": { "type": "string" },
-        "status": { "type": "string" }
+        "makeModel": { "type": "string" },
+        "status": { "type": "string" },
+        "insuranceValidUntil": { "type": "string" },
+        "pucValidUntil": { "type": "string" },
+        "chassisNumber": { "type": "string" },
+        "engineNumber": { "type": "string" },
+        "registrationDate": { "type": "string" },
+        "rtoZone": { "type": "string" },
+        "stolenFlag": { "type": "boolean" }
       },
       "required": ["registrationNumber", "status"]
     }

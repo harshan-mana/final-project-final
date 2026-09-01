@@ -3,7 +3,7 @@ import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, ShieldAlert, User, Phone, Save, X } from 'lucide-react';
+import { Shield, ShieldAlert, User, Phone, Save, X, Zap } from 'lucide-react';
 import AegisNavbar from './components/AegisNavbar';
 import HelmetView from './components/HelmetView';
 import AuthorityView from './components/AuthorityView';
@@ -12,7 +12,21 @@ import AuthModal from './components/AuthModal';
 
 export default function App() {
   const [user, setUser] = useState(auth.currentUser);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [guestUser, setGuestUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('aegis_guest_active');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [userRole, setUserRole] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('aegis_guest_role') || null;
+    } catch {
+      return null;
+    }
+  });
   const [currentView, setCurrentView] = useState<'helmet' | 'authority' | 'profile' | 'settings'>('helmet');
   const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -25,6 +39,8 @@ export default function App() {
     guardianName: '',
     guardianPhone: ''
   });
+
+  const effectiveUser = user || guestUser;
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -63,9 +79,13 @@ export default function App() {
           setLoading(false);
         });
       } else {
-        setUserRole(null);
-        setNeedsProfile(false);
-        setShowOnboarding(false);
+        if (!guestUser) {
+          setUserRole(null);
+          setNeedsProfile(false);
+          setShowOnboarding(false);
+        } else {
+          setUserRole('Driver');
+        }
         setLoading(false);
       }
     });
@@ -74,7 +94,45 @@ export default function App() {
       unsubscribeAuth();
       if (unsubscribeProfile) unsubscribeProfile();
     };
-  }, [currentView]);
+  }, [currentView, guestUser]);
+
+  const handleGuestLogin = () => {
+    const guest = {
+      uid: 'guest_sentry_node',
+      displayName: 'Guest Sentry Pilot',
+      email: 'guest@aegis-sentry.local',
+      isAnonymous: true,
+    };
+    try {
+      localStorage.setItem('aegis_guest_active', JSON.stringify(guest));
+      localStorage.setItem('aegis_guest_role', 'Driver');
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+    setGuestUser(guest);
+    setUserRole('Driver');
+    setNeedsProfile(false);
+    setShowOnboarding(false);
+    setCurrentView('helmet');
+    setIsAuthModalOpen(false);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      localStorage.removeItem('aegis_guest_active');
+      localStorage.removeItem('aegis_guest_role');
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+    setGuestUser(null);
+    setUser(null);
+    setUserRole(null);
+    try {
+      await auth.signOut();
+    } catch (e) {
+      console.warn('Firebase sign out error:', e);
+    }
+  };
 
   const handleNewUser = async (uid: string, email: string) => {
     const defaultRole = email.includes('admin') || email.includes('rto') ? 'RTO' : 'Driver';
@@ -101,7 +159,7 @@ export default function App() {
   };
 
   const submitOnboarding = async () => {
-    if (!user) return;
+    if (!effectiveUser) return;
     const nameRegex = /^[a-zA-Z\s]+$/;
     const phoneRegex = /^\d{10,15}$/;
     const newErrors: {[key: string]: string} = {};
@@ -124,20 +182,22 @@ export default function App() {
       return;
     }
 
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        name: onboardingData.name,
-        phone: onboardingData.phone,
-        emergencyContact1: {
-          name: onboardingData.guardianName,
-          phone: onboardingData.guardianPhone
-        }
-      });
-      setShowOnboarding(false);
-      setNeedsProfile(false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    if (user) {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          name: onboardingData.name,
+          phone: onboardingData.phone,
+          emergencyContact1: {
+            name: onboardingData.guardianName,
+            phone: onboardingData.guardianPhone
+          }
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      }
     }
+    setShowOnboarding(false);
+    setNeedsProfile(false);
   };
 
   if (loading) {
@@ -207,11 +267,12 @@ export default function App() {
       <AegisNavbar 
         userRole={userRole} 
         onViewChange={setCurrentView} 
-        currentView={currentView} 
+        currentView={currentView}
+        onSignOut={handleSignOut}
       />
       
       <main>
-        {!user ? (
+        {!effectiveUser ? (
           <div className="min-h-screen flex items-center justify-center px-4 py-20 relative">
              <div className="absolute inset-0 z-0 opacity-10 pointer-events-none overflow-hidden">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-brand-primary rounded-full blur-[200px]" />
@@ -229,15 +290,27 @@ export default function App() {
                <h1 className="text-5xl sm:text-7xl font-display font-bold tracking-tighter mb-6 leading-none">
                  AI TRAFFIC <br /> <span className="text-brand-primary">SAFETY</span> FOR ALL
                </h1>
-               <p className="text-white/40 text-lg mb-12 max-w-md mx-auto leading-relaxed">
+               <p className="text-white/40 text-lg mb-10 max-w-md mx-auto leading-relaxed">
                  Integrating real-time image recognition with RTO databases to prevent accidents and enforce safety standards.
                </p>
-               <button 
-                 onClick={() => setIsAuthModalOpen(true)}
-                 className="px-10 py-4 bg-white text-black text-sm font-bold uppercase tracking-widest rounded-full hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/10"
-               >
-                 Get Started
-               </button>
+               
+               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                 <button 
+                   id="btn-get-started"
+                   onClick={() => setIsAuthModalOpen(true)}
+                   className="w-full sm:w-auto px-10 py-4 bg-white text-black text-sm font-bold uppercase tracking-widest rounded-full hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/10"
+                 >
+                   Get Started
+                 </button>
+                 <button 
+                   id="btn-hero-continue-as-guest"
+                   onClick={handleGuestLogin}
+                   className="w-full sm:w-auto px-8 py-4 bg-cyber-blue/15 border border-cyber-blue/40 text-cyber-blue text-sm font-black uppercase tracking-widest rounded-full hover:bg-cyber-blue hover:text-black hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-cyber-blue/10"
+                 >
+                   <Zap className="w-4 h-4" />
+                   Continue as Guest
+                 </button>
+               </div>
              </div>
           </div>
         ) : (
@@ -273,7 +346,8 @@ export default function App() {
 
       <AuthModal 
         isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
+        onClose={() => setIsAuthModalOpen(false)}
+        onGuestLogin={handleGuestLogin}
       />
 
       {/* Mandatory Onboarding Modal */}

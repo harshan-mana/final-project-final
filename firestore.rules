@@ -34,17 +34,14 @@ service cloud.firestore {
     }
 
     function isValidViolation(data) {
-      return data.keys().hasAll(['type', 'vehicleNumber', 'status', 'timestamp', 'userId']) &&
-             data.type in ['TRIPLE_RIDING', 'ACCIDENT', 'FAKE_PLATE', 'OVER_SPEEDING'] &&
-             data.vehicleNumber is string && data.vehicleNumber.size() <= 15 &&
-             data.status in ['Pending', 'Resolved', 'Spam'] &&
-             data.userId == request.auth.uid;
+      return data.keys().hasAll(['type', 'vehicleNumber', 'status']) &&
+             data.vehicleNumber is string && data.vehicleNumber.size() <= 30 &&
+             data.status is string;
     }
 
     function isValidAlert(data) {
-      return data.keys().hasAll(['userName', 'userPhone', 'actionType', 'timestamp', 'userId']) &&
-             data.userName is string && data.userPhone is string &&
-             data.userId == request.auth.uid;
+      return data.keys().hasAll(['userName', 'userPhone', 'actionType', 'userId']) &&
+             data.userName is string && data.userPhone is string;
     }
 
     // --- Collection Rules ---
@@ -52,36 +49,34 @@ service cloud.firestore {
     // USERS COLLECTION
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if isAdmin();
-      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming());
-      allow update: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'emergencyContact1', 'emergencyContact2', 'autoReport', 'guardianNotifications'])
-      );
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
     }
 
     // VIOLATIONS COLLECTION
     match /violations/{violationId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn(); // Queries must filter by status or userId in client
-      allow create: if isVerified() && isValidViolation(incoming()) && isValidId(violationId);
-      allow update: if isAdmin() && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isValidViolation(incoming()) && isValidId(violationId);
+      allow update: if isSignedIn() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'penaltyAmount', 'challanNumber', 'notes'])
       );
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn();
     }
 
     // ALERTS COLLECTION
     match /alerts/{alertId} {
       allow get: if isSignedIn();
-      allow list: if isAdmin();
+      allow list: if isSignedIn();
       allow create: if isSignedIn() && isValidAlert(incoming()) && isValidId(alertId);
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn();
     }
 
     // VEHICLES REGISTRY
     match /vehicles/{regNo} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() && isValidId(regNo);
+      allow write: if isSignedIn() && isValidId(regNo);
     }
   }
 }
