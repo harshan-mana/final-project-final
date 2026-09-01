@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "User": {
+      "title": "Citizen Profile",
+      "description": "Registry and safety data for the system operator.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique auth UID" },
+        "name": { "type": "string", "description": "Full legal name" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string", "description": "Primary mobile contact" },
+        "role": { "type": "string", "enum": ["Driver", "RTO", "Admin"] },
+        "emergencyContact1": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "phone": { "type": "string" }
+          }
+        },
+        "emergencyContact2": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "phone": { "type": "string" }
+          }
+        },
+        "autoReport": { "type": "boolean" },
+        "guardianNotifications": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "role", "phone"]
+    },
+    "Violation": {
+      "title": "Safety Infraction",
+      "description": "AI-detected traffic violation event.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["TRIPLE_RIDING", "ACCIDENT", "FAKE_PLATE", "OVER_SPEEDING"] },
+        "vehicleNumber": { "type": "string" },
+        "description": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Resolved", "Spam"] },
+        "timestamp": { "type": "object", "description": "Timestamp object" },
+        "userId": { "type": "string", "description": "Reporter UID" }
+      },
+      "required": ["type", "vehicleNumber", "status", "timestamp"]
+    },
+    "Alert": {
+      "title": "Emergency SOS",
+      "description": "High-priority emergency dispatch signal.",
+      "type": "object",
+      "properties": {
+        "userName": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "actionType": { "type": "string" },
+        "googleMapsUrl": { "type": "string" },
+        "timestamp": { "type": "object" },
+        "userId": { "type": "string" }
+      },
+      "required": ["userName", "userPhone", "timestamp", "userId"]
+    },
+    "Vehicle": {
+      "title": "Vehicle Registry",
+      "description": "Official RTO vehicle registration record.",
+      "type": "object",
+      "properties": {
+        "registrationNumber": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "vehicleType": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["registrationNumber", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Authenticated user profiles."
+    },
+    "/violations/{violationId}": {
+      "schema": "Violation",
+      "description": "Public safety infractions feed."
+    },
+    "/alerts/{alertId}": {
+      "schema": "Alert",
+      "description": "Live emergency SOS dispatch."
+    },
+    "/vehicles/{regNo}": {
+      "schema": "Vehicle",
+      "description": "Central vehicle registry database."
+    }
+  }
+}

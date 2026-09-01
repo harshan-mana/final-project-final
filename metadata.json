@@ -1,0 +1,6 @@
+{
+  "name": "AegisHelmet AI",
+  "description": "Smart helmet system using AI for real-time traffic violation detection (number plates, overspeeding, multiple riders) and emergency accident alerts.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": []
+}

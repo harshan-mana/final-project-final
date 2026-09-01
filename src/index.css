@@ -1,0 +1,59 @@
+/** @theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", sans-serif;
+  
+  --color-cyber-blue: #00D1FF;
+  --color-cyber-orange: #FF6B00;
+  --color-cyber-purple: #8B5CF6;
+  --color-cyber-green: #00FFB3;
+  --color-cyber-red: #FF3B3B;
+  --color-deep-space: #050816;
+  
+  --color-brand-primary: #00D1FF;
+  --color-brand-dark: #050816;
+  --color-brand-accent: #00FFB3;
+}
+
+@layer base {
+  body {
+    @apply bg-[#050816] text-white font-sans antialiased overflow-x-hidden;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
+  }
+  
+  .neon-border {
+    @apply border border-cyber-blue/30 shadow-[0_0_15px_rgba(0,209,255,0.2)];
+  }
+
+  .neon-text-blue {
+    @apply text-cyber-blue drop-shadow-[0_0_8px_rgba(0,209,255,0.8)];
+  }
+
+  .cyber-grid {
+    background-image: linear-gradient(rgba(0, 209, 255, 0.05) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(0, 209, 255, 0.05) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .status-badge {
+    @apply px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5;
+  }
+}
+
+.scrolling-text {
+  animation: scroll 20s linear infinite;
+}
+
+@keyframes scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}

@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 3. Global Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Role Lookup
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isAdmin() {
+      return isSignedIn() && getUserData().role == 'RTO';
+    }
+
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'name', 'role', 'phone']) &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() <= 100 &&
+             data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 20 &&
+             data.role in ['Driver', 'RTO'] &&
+             (data.emergencyContact1 == null || (data.emergencyContact1.name is string && data.emergencyContact1.phone is string));
+    }
+
+    function isValidViolation(data) {
+      return data.keys().hasAll(['type', 'vehicleNumber', 'status', 'timestamp', 'userId']) &&
+             data.type in ['TRIPLE_RIDING', 'ACCIDENT', 'FAKE_PLATE', 'OVER_SPEEDING'] &&
+             data.vehicleNumber is string && data.vehicleNumber.size() <= 15 &&
+             data.status in ['Pending', 'Resolved', 'Spam'] &&
+             data.userId == request.auth.uid;
+    }
+
+    function isValidAlert(data) {
+      return data.keys().hasAll(['userName', 'userPhone', 'actionType', 'timestamp', 'userId']) &&
+             data.userName is string && data.userPhone is string &&
+             data.userId == request.auth.uid;
+    }
+
+    // --- Collection Rules ---
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isOwner(userId) && isValidUser(incoming());
+      allow update: if isSignedIn() && isOwner(userId) && isValidUser(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'emergencyContact1', 'emergencyContact2', 'autoReport', 'guardianNotifications'])
+      );
+    }
+
+    // VIOLATIONS COLLECTION
+    match /violations/{violationId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); // Queries must filter by status or userId in client
+      allow create: if isVerified() && isValidViolation(incoming()) && isValidId(violationId);
+      allow update: if isAdmin() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ALERTS COLLECTION
+    match /alerts/{alertId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isValidAlert(incoming()) && isValidId(alertId);
+      allow delete: if isAdmin();
+    }
+
+    // VEHICLES REGISTRY
+    match /vehicles/{regNo} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidId(regNo);
+    }
+  }
+}
