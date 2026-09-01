@@ -9,12 +9,13 @@ import HelmetView from './components/HelmetView';
 import AuthorityView from './components/AuthorityView';
 import SettingsView from './components/SettingsView';
 import AuthModal from './components/AuthModal';
+import { AegisAuthUser, LOCAL_AUTH_STORAGE_KEY } from './types/auth';
 
 export default function App() {
   const [user, setUser] = useState(auth.currentUser);
-  const [guestUser, setGuestUser] = useState<any>(() => {
+  const [localUser, setLocalUser] = useState<AegisAuthUser | null>(() => {
     try {
-      const saved = localStorage.getItem('aegis_guest_active');
+      const saved = localStorage.getItem(LOCAL_AUTH_STORAGE_KEY);
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -22,6 +23,11 @@ export default function App() {
   });
   const [userRole, setUserRole] = useState<string | null>(() => {
     try {
+      const savedUser = localStorage.getItem(LOCAL_AUTH_STORAGE_KEY);
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        return parsed.role || 'Driver';
+      }
       return localStorage.getItem('aegis_guest_role') || null;
     } catch {
       return null;
@@ -40,7 +46,7 @@ export default function App() {
     guardianPhone: ''
   });
 
-  const effectiveUser = user || guestUser;
+  const effectiveUser = user || localUser;
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -79,12 +85,12 @@ export default function App() {
           setLoading(false);
         });
       } else {
-        if (!guestUser) {
+        if (!localUser) {
           setUserRole(null);
           setNeedsProfile(false);
           setShowOnboarding(false);
         } else {
-          setUserRole('Driver');
+          setUserRole(localUser.role || 'Driver');
         }
         setLoading(false);
       }
@@ -94,37 +100,44 @@ export default function App() {
       unsubscribeAuth();
       if (unsubscribeProfile) unsubscribeProfile();
     };
-  }, [currentView, guestUser]);
+  }, [currentView, localUser]);
 
-  const handleGuestLogin = () => {
-    const guest = {
-      uid: 'guest_sentry_node',
-      displayName: 'Guest Sentry Pilot',
-      email: 'guest@aegis-sentry.local',
-      isAnonymous: true,
-    };
-    try {
-      localStorage.setItem('aegis_guest_active', JSON.stringify(guest));
-      localStorage.setItem('aegis_guest_role', 'Driver');
-    } catch (e) {
-      console.warn('LocalStorage error:', e);
-    }
-    setGuestUser(guest);
-    setUserRole('Driver');
+  const handleAuthSuccess = (authUser: AegisAuthUser) => {
+    setLocalUser(authUser);
+    setUserRole(authUser.role || 'Driver');
     setNeedsProfile(false);
     setShowOnboarding(false);
     setCurrentView('helmet');
     setIsAuthModalOpen(false);
   };
 
+  const handleGuestLogin = () => {
+    const guest: AegisAuthUser = {
+      uid: 'guest_sentry_node',
+      displayName: 'Guest Sentry Pilot',
+      email: 'guest@aegis-sentry.local',
+      provider: 'guest',
+      role: 'Driver',
+      isAnonymous: true,
+    };
+    try {
+      localStorage.setItem(LOCAL_AUTH_STORAGE_KEY, JSON.stringify(guest));
+      localStorage.setItem('aegis_guest_role', 'Driver');
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+    handleAuthSuccess(guest);
+  };
+
   const handleSignOut = async () => {
     try {
+      localStorage.removeItem(LOCAL_AUTH_STORAGE_KEY);
       localStorage.removeItem('aegis_guest_active');
       localStorage.removeItem('aegis_guest_role');
     } catch (e) {
       console.warn('LocalStorage error:', e);
     }
-    setGuestUser(null);
+    setLocalUser(null);
     setUser(null);
     setUserRole(null);
     try {
@@ -347,7 +360,7 @@ export default function App() {
       <AuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)}
-        onGuestLogin={handleGuestLogin}
+        onLogin={handleAuthSuccess}
       />
 
       {/* Mandatory Onboarding Modal */}

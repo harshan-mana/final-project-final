@@ -34,6 +34,7 @@ import {
   exportVehiclesToCSV,
   parseVehiclesFromCSV,
 } from '../lib/rtoData';
+import { LOCAL_PROFILE_STORAGE_KEY, LOCAL_AUTH_STORAGE_KEY } from '../types/auth';
 
 export default function SettingsView() {
   const [wifiStatus, setWifiStatus] = useState<'disconnected' | 'scanning' | 'handshake' | 'connected'>('disconnected');
@@ -71,12 +72,15 @@ export default function SettingsView() {
       }
 
       // Guest / Local profile fallback
-      const savedGuestProfile = localStorage.getItem('aegis_guest_profile');
-      const defaultProfile = savedGuestProfile ? JSON.parse(savedGuestProfile) : {
-        name: 'Guest Sentry Pilot',
-        email: 'guest@aegis-sentry.local',
+      const savedProfile = localStorage.getItem(LOCAL_PROFILE_STORAGE_KEY) || localStorage.getItem('aegis_guest_profile');
+      const savedAuth = localStorage.getItem(LOCAL_AUTH_STORAGE_KEY);
+      const parsedAuth = savedAuth ? JSON.parse(savedAuth) : null;
+
+      const defaultProfile = savedProfile ? JSON.parse(savedProfile) : {
+        name: parsedAuth?.displayName || 'Guest Sentry Pilot',
+        email: parsedAuth?.email || 'guest@aegis-sentry.local',
         phone: '9876543210',
-        role: 'Driver',
+        role: parsedAuth?.role || 'Driver',
         emergencyContact1: { name: 'Dispatch Station 112', phone: '1120001122' },
         emergencyContact2: { name: 'Emergency Control', phone: '1080001088' },
         autoReport: true,
@@ -158,9 +162,9 @@ export default function SettingsView() {
           ...profile,
           updatedAt: new Date().toISOString(),
         });
-      } else {
-        localStorage.setItem('aegis_guest_profile', JSON.stringify(profile));
       }
+      localStorage.setItem(LOCAL_PROFILE_STORAGE_KEY, JSON.stringify(profile));
+      localStorage.setItem('aegis_guest_profile', JSON.stringify(profile));
       setOriginalProfile({ ...profile });
       setIsDirty(false);
       setShowSuccess(true);
